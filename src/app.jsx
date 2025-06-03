@@ -2,6 +2,9 @@ import 'src/global.css';
 
 import { useEffect } from 'react';
 
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+
 import { usePathname } from 'src/routes/hooks';
 
 import { themeConfig, ThemeProvider } from 'src/theme';
@@ -18,6 +21,7 @@ export default function App({ children }) {
   useScrollToTop();
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
     <AuthProvider>
       <SettingsProvider defaultSettings={defaultSettings}>
         <ThemeProvider
@@ -33,6 +37,7 @@ export default function App({ children }) {
         </ThemeProvider>
       </SettingsProvider>
     </AuthProvider>
+    </LocalizationProvider>
   );
 }
 

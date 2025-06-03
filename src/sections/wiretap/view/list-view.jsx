@@ -31,6 +31,7 @@ import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
+import { ProductTableSearchFilters } from 'src/sections/wiretap/list-search';
 import { ProductTableToolbar } from 'src/sections/wiretap/product-table-toolbar';
 import { ProductTableFiltersResult } from 'src/sections/wiretap/product-table-filters-result';
 import {
@@ -57,29 +58,40 @@ const HIDE_COLUMNS_TOGGLABLE = ['category', 'actions'];
 export function ProductListView() {
   const confirmDialog = useBoolean();
 
-  const { products, productsLoading } = useGetProducts();
+  const { products, productsLoading } = useGetProducts(); //呼叫產品資料 API 並取得 products（一個陣列）。
 
-  const [tableData, setTableData] = useState(products);
+  const [tableData, setTableData] = useState([]);
   const [selectedRowIds, setSelectedRowIds] = useState([]);
   const [filterButtonEl, setFilterButtonEl] = useState(null);
 
-  const filters = useSetState({ publish: [], stock: [] });
+  // const filters = useSetState({ publish: [], stock: [] }); 創建 filters（含 state、setState）
+  const filters = useSetState({
+    name: '',
+    createdAt: null,
+    stock: [],
+    priceMin: '',
+    publish: [],
+  });
+  //filters.state 單獨取出，取名 currentFilters
   const { state: currentFilters } = filters;
 
   const [columnVisibilityModel, setColumnVisibilityModel] = useState(HIDE_COLUMNS);
 
   useEffect(() => {
-    if (products.length) {
       setTableData(products);
-    }
   }, [products]);
 
-  const canReset = currentFilters.publish.length > 0 || currentFilters.stock.length > 0;
+  const canReset =
+    currentFilters.name !== '' ||
+    currentFilters.createdAt !== null ||
+    currentFilters.stock.length > 0 ||
+    currentFilters.priceMin !== '' ||
+    currentFilters.publish.length > 0;
 
-  const dataFiltered = applyFilter({
-    inputData: tableData,
-    filters: currentFilters,
-  });
+  // const dataFiltered = applyFilter({
+  //   inputData: tableData,
+  //   filters: currentFilters,
+  // });
 
   const handleDeleteRow = useCallback(
     (id) => {
@@ -107,8 +119,9 @@ export function ProductListView() {
         canReset={canReset}
         selectedRowIds={selectedRowIds}
         setFilterButtonEl={setFilterButtonEl}
-        filteredResults={dataFiltered.length}
+        filteredResults={tableData.length}
         onOpenConfirmDeleteRows={confirmDialog.onTrue}
+        onResetFilters={handleResetFilters}  // 把 handleResetFilters 當作 prop 傳下去
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,10 +233,35 @@ export function ProductListView() {
       }
     />
   );
+  //設定上方搜尋欄
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  //只要呼叫 applyFilter() 就可以執行篩選
+  const handleSearch = (newFilters) => {
+      // 1. 更新父層的 filters.state
+    filters.setState(newFilters);
+    //console.log(newFilters);
+    const filteredData = applyFilter({
+      inputData: products,
+      filters: newFilters,
+    });
+    setTableData(filteredData);
+    // console.log(filteredData);
+  };
 
+  const handleResetFilters = () => {
+    filters.resetState();       // 重置 filters.state
+    setTableData(products);     // 重置表格資料
+  };
   return (
     <>
       <DashboardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <ProductTableSearchFilters
+        filters={filters}
+        onSearch={handleSearch} // 設定是否要點擊搜尋才 applyFilter，或即時套用
+        
+        open={filtersOpen}
+        onToggle={() => setFiltersOpen((prev) => !prev)} //當使用者點擊「展開/收起按鈕」時，呼叫 setFiltersOpen 去切換狀態
+      />
         <CustomBreadcrumbs
           heading="List"
           links={[
@@ -256,7 +294,7 @@ export function ProductListView() {
           <DataGrid
             checkboxSelection
             disableRowSelectionOnClick
-            rows={dataFiltered}
+            rows={tableData} // 改用 tableData，而不是 dataFiltered
             columns={columns}
             loading={productsLoading}
             getRowHeight={() => 'auto'}
@@ -294,16 +332,17 @@ function CustomToolbar({
   filteredResults,
   setFilterButtonEl,
   onOpenConfirmDeleteRows,
+  onResetFilters,
 }) {
   return (
     <>
       <GridToolbarContainer>
-        <ProductTableToolbar
+        {/* <ProductTableToolbar
           filters={filters}
           options={{ stocks: PRODUCT_STOCK_OPTIONS, publishs: PUBLISH_OPTIONS }}
-        />
+        /> */}
 
-        <GridToolbarQuickFilter />
+        {/* <GridToolbarQuickFilter /> */}
 
         <Box
           sx={{
@@ -332,9 +371,11 @@ function CustomToolbar({
       </GridToolbarContainer>
 
       {canReset && (
+        
         <ProductTableFiltersResult
           filters={filters}
           totalResults={filteredResults}
+          onReset={onResetFilters}  // 這裡傳入onReset
           sx={{ p: 2.5, pt: 0 }}
         />
       )}
@@ -366,15 +407,34 @@ export const GridActionsLinkItem = forwardRef((props, ref) => {
 // // ----------------------------------------------------------------------
 
 function applyFilter({ inputData, filters }) {
-  const { stock, publish } = filters;
-
-  if (stock.length) {
-    inputData = inputData.filter((product) => stock.includes(product.inventoryType));
+  const { name, createdAt, stock, priceMin, publish } = filters;
+  console.log(filters);
+  let data = [...inputData];
+  console.log(data);
+  if (Array.isArray(stock) && stock.length > 0) {
+    data = data.filter((item) => stock.includes(item.inventoryType));
   }
 
-  if (publish.length) {
-    inputData = inputData.filter((product) => publish.includes(product.publish));
+  if (Array.isArray(publish) && publish.length > 0) {
+    data = data.filter((item) => publish.includes(item.publish));
   }
 
-  return inputData;
+  if (name) {
+    data = data.filter((item) => item.name.toLowerCase().includes(name.toLowerCase()));
+  }
+
+  if (createdAt) {
+    data = data.filter((item) => {
+      const itemDate = new Date(item.createdAt).toDateString();
+      const selectedDate = new Date(createdAt).toDateString();
+      return itemDate === selectedDate;
+    });
+  }
+
+  if (priceMin) {
+    data = data.filter((item) => Number(item.price) >= Number(priceMin));
+  }
+  console.log(data);
+  return data;
+  
 }

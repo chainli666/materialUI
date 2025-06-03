@@ -3,7 +3,8 @@ import { Helmet } from 'react-helmet-async';
 import { CONFIG } from 'src/global-config';
 
 // import { BlankView } from 'src/sections/blank/view';
-import {ProductListView} from 'src/sections/wiretap/view';
+import { ProductListView } from 'src/sections/wiretap/view';
+
 //import {ListTest} from 'src/sections/wiretap/view';
 
 // ----------------------------------------------------------------------
@@ -18,7 +19,9 @@ export default function Page() {
       </Helmet>
 
       {/* <BlankView title="Page four" /> */}
+      
       <ProductListView/>
+      
       {/* <ListTest/> */}
     </>
   );
