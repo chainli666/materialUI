@@ -60,7 +60,9 @@ export function ProductListView() {
 
   const { products, productsLoading } = useGetProducts(); //呼叫產品資料 API 並取得 products（一個陣列）。
 
-  const [tableData, setTableData] = useState([]);
+  const [tableData, setTableData] = useState(products);
+  const [filteredData, setFilteredData] = useState(products);
+
   const [selectedRowIds, setSelectedRowIds] = useState([]);
   const [filterButtonEl, setFilterButtonEl] = useState(null);
 
@@ -78,8 +80,29 @@ export function ProductListView() {
   const [columnVisibilityModel, setColumnVisibilityModel] = useState(HIDE_COLUMNS);
 
   useEffect(() => {
+    if (products.length) {
       setTableData(products);
+    }
   }, [products]);
+
+  useEffect(() => {
+    if (products.length) {
+      setFilteredData(products);
+    }
+  }, [products]);
+
+  useEffect(() => {
+    const isReset = 
+      currentFilters.name === '' &&
+      currentFilters.createdAt === null &&
+      currentFilters.stock.length === 0 &&
+      currentFilters.priceMin === '' &&
+      currentFilters.publish.length === 0;
+  
+    if (isReset) {
+      setFilteredData(tableData);
+    }
+  }, [currentFilters, tableData]);
 
   const canReset =
     currentFilters.name !== '' ||
@@ -88,10 +111,6 @@ export function ProductListView() {
     currentFilters.priceMin !== '' ||
     currentFilters.publish.length > 0;
 
-  // const dataFiltered = applyFilter({
-  //   inputData: tableData,
-  //   filters: currentFilters,
-  // });
 
   const handleDeleteRow = useCallback(
     (id) => {
@@ -112,16 +131,34 @@ export function ProductListView() {
     setTableData(deleteRows);
   }, [selectedRowIds, tableData]);
 
+  //設定上方搜尋欄
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  //只要呼叫 applyFilter() 就可以執行篩選
+  const handleSearch = (newFilters) => {
+      // 1. 更新父層的 filters.state
+    filters.setState(newFilters);
+    //console.log(newFilters);
+    const result = applyFilter({
+      inputData: products,
+      filters: newFilters,
+    });
+    setFilteredData(result);
+    // console.log(filteredData);
+  };
+
+
+
   const CustomToolbarCallback = useCallback(
     () => (
+      console.log(tableData, "0000"),
       <CustomToolbar
         filters={filters}
         canReset={canReset}
         selectedRowIds={selectedRowIds}
         setFilterButtonEl={setFilterButtonEl}
-        filteredResults={tableData.length}
+        filteredResults={filteredData.length}
         onOpenConfirmDeleteRows={confirmDialog.onTrue}
-        onResetFilters={handleResetFilters}  // 把 handleResetFilters 當作 prop 傳下去
+        // onResetFilters={handleResetFilters}  // 把 handleResetFilters 當作 prop 傳下去
       />
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,25 +270,8 @@ export function ProductListView() {
       }
     />
   );
-  //設定上方搜尋欄
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  //只要呼叫 applyFilter() 就可以執行篩選
-  const handleSearch = (newFilters) => {
-      // 1. 更新父層的 filters.state
-    filters.setState(newFilters);
-    //console.log(newFilters);
-    const filteredData = applyFilter({
-      inputData: products,
-      filters: newFilters,
-    });
-    setTableData(filteredData);
-    // console.log(filteredData);
-  };
+  
 
-  const handleResetFilters = () => {
-    filters.resetState();       // 重置 filters.state
-    setTableData(products);     // 重置表格資料
-  };
   return (
     <>
       <DashboardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
@@ -294,7 +314,7 @@ export function ProductListView() {
           <DataGrid
             checkboxSelection
             disableRowSelectionOnClick
-            rows={tableData} // 改用 tableData，而不是 dataFiltered
+            rows={filteredData} // 改用 tableData，而不是 dataFiltered
             columns={columns}
             loading={productsLoading}
             getRowHeight={() => 'auto'}
@@ -332,7 +352,6 @@ function CustomToolbar({
   filteredResults,
   setFilterButtonEl,
   onOpenConfirmDeleteRows,
-  onResetFilters,
 }) {
   return (
     <>
@@ -371,11 +390,10 @@ function CustomToolbar({
       </GridToolbarContainer>
 
       {canReset && (
-        
+        console.log(filteredResults, "123"),
         <ProductTableFiltersResult
           filters={filters}
           totalResults={filteredResults}
-          onReset={onResetFilters}  // 這裡傳入onReset
           sx={{ p: 2.5, pt: 0 }}
         />
       )}
@@ -408,7 +426,7 @@ export const GridActionsLinkItem = forwardRef((props, ref) => {
 
 function applyFilter({ inputData, filters }) {
   const { name, createdAt, stock, priceMin, publish } = filters;
-  console.log(filters);
+  console.log(filters, "apply");
   let data = [...inputData];
   console.log(data);
   if (Array.isArray(stock) && stock.length > 0) {
